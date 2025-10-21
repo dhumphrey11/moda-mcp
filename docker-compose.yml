@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  ingestion-coinbase:
+    build: ./ingestion/coinbase
+    ports:
+      - "8001:8000"
+
+  ingestion-coingecko:
+    build: ./ingestion/coingecko
+    ports:
+      - "8002:8000"
+
+  ingestion-polygon:
+    build: ./ingestion/polygon
+    ports:
+      - "8003:8000"
+
+  ingestion-coinapi:
+    build: ./ingestion/coinapi
+    ports:
+      - "8004:8000"
+
+  ingestion-yfinance:
+    build: ./ingestion/yfinance
+    ports:
+      - "8005:8000"
+
+  features:
+    build: ./features
+    ports:
+      - "8010:8000"
+
+  signals:
+    build: ./signals
+    ports:
+      - "8020:8000"
+
+  paper_trading:
+    build: ./paper_trading
+    ports:
+      - "8030:8000"
+
+  prompt_engine:
+    build: ./prompt_engine
+    ports:
+      - "8040:8000"
+
+# Frontend can be run with `npm run dev` in ./frontend or containerized separately if desired.

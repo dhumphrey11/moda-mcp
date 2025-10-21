@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+.env.*
+.pytest_cache/
+.dist/
+.build/
+
+# Node
+node_modules/
+.next/
+.next-standalone/
+.next-static/
+out/
+.npm/
+.yarn/
+
+# MacOS
+.DS_Store
+
+# Docker
+*.log
+*.pid
+*.seed
+coverage/
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+
+# IDE
+.vscode/
+.idea/

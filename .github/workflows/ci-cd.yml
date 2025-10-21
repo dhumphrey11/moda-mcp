@@ -1,0 +1,241 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+
+    env:
+      PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      REGION: ${{ secrets.GCP_REGION }}
+      COMMIT_SHA: ${{ github.sha }}
+      DEPLOY: ${{ secrets.DEPLOY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          # Install all service requirements (lightweight, speeds local tools if used)
+          find . -name requirements.txt -exec pip install -r {} +
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json', 'frontend/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      # Authenticate to Google Cloud only when deployment is enabled
+      - name: Google Auth (SA Key)
+        if: env.DEPLOY == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud SDK
+        if: env.DEPLOY == 'true'
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Configure Docker for gcr.io
+        if: env.DEPLOY == 'true'
+        run: gcloud auth configure-docker gcr.io -q
+
+      - name: Build Docker images (tag with SHA)
+        run: |
+          services=(
+            ingestion/coinbase
+            ingestion/coingecko
+            ingestion/polygon
+            ingestion/coinapi
+            ingestion/yfinance
+            features
+            signals
+            paper_trading
+            prompt_engine
+          )
+          for service in "${services[@]}"; do
+            image=gcr.io/${PROJECT_ID}/${service//\//-}:${COMMIT_SHA}
+            echo "Building $image from $service..."
+            docker build -t "$image" "$service"
+            if [ "${DEPLOY}" = "true" ]; then
+              echo "Pushing $image..."
+              docker push "$image"
+            fi
+          done
+
+      - name: Deploy to Cloud Run
+        if: env.DEPLOY == 'true'
+        run: |
+          services=(
+            ingestion/coinbase
+            ingestion/coingecko
+            ingestion/polygon
+            ingestion/coinapi
+            ingestion/yfinance
+            features
+            signals
+            paper_trading
+            prompt_engine
+          )
+          for service in "${services[@]}"; do
+            image=gcr.io/${PROJECT_ID}/${service//\//-}:${COMMIT_SHA}
+            service_name=${service//\//-}
+            echo "Deploying $service_name to Cloud Run in ${REGION}..."
+            gcloud run deploy "$service_name" \
+              --image "$image" \
+              --region "$REGION" \
+              --platform managed \
+              --allow-unauthenticated \
+              --port 8000
+          done
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+
+    env:
+      PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      REGION: ${{ secrets.GCP_REGION }}
+      COMMIT_SHA: ${{ github.sha }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Cache pip
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          find . -name requirements.txt -exec pip install -r {} +
+
+      - name: Cache npm
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install Node.js dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Build Docker images
+        run: |
+          services=(
+            ingestion/coinbase
+            ingestion/coingecko
+            ingestion/polygon
+            ingestion/coinapi
+            ingestion/yfinance
+            features
+            signals
+            paper_trading
+            prompt_engine
+          )
+          for service in "${services[@]}"; do
+            image=gcr.io/${{ secrets.GCP_PROJECT_ID }}/${service//\//-}:${{ github.sha }}
+            echo "Building $image..."
+            docker build -t "$image" "$service"
+            if [ "$DEPLOY" = "true" ]; then
+              echo "Pushing $image..."
+              docker push "$image"
+            fi
+          done
+        env:
+          DEPLOY: ${{ secrets.DEPLOY }}
+
+      - name: Deploy to Google Cloud Run
+        if: env.DEPLOY == 'true'
+        run: |
+          services=(
+            ingestion/coinbase
+            ingestion/coingecko
+            ingestion/polygon
+            ingestion/coinapi
+            ingestion/yfinance
+            features
+            signals
+            paper_trading
+            prompt_engine
+          )
+          for service in "${services[@]}"; do
+            image=gcr.io/${{ secrets.GCP_PROJECT_ID }}/${service//\//-}:${{ github.sha }}
+            service_name=${service//\//-}
+            echo "Deploying $service_name to Cloud Run..."
+            gcloud run deploy "$service_name" \
+              --image "$image" \
+              --region "$REGION" \
+              --platform managed \
+              --allow-unauthenticated
+          done
+        env:
+          REGION: ${{ secrets.GCP_REGION }}
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
