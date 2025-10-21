@@ -43,8 +43,11 @@ jobs:
       - name: Install Python dependencies
         run: |
           python3 -m pip install --upgrade pip
-          # Corrected the command to use '-r' for requirements files
-          find . -name requirements.txt -exec pip install -r {} +
+          # Install dependencies from all requirements.txt files
+          find . -name requirements.txt | while read req; do
+            echo "Installing from $req"
+            pip install -r "$req"
+          done
 
       - name: Cache npm
         uses: actions/cache@v4
