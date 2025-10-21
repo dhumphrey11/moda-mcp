@@ -119,6 +119,9 @@ jobs:
             paper_trading
             prompt_engine
           )
+          # Service account with BigQuery and Secret Manager access
+          SERVICE_ACCOUNT="github-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
+          
           for service in "${services[@]}"; do
             image=gcr.io/${PROJECT_ID}/${service//\//-}:${COMMIT_SHA}
             service_name=${service//\//-}
@@ -128,5 +131,11 @@ jobs:
               --region "$REGION" \
               --platform managed \
               --allow-unauthenticated \
-              --port 8000
+              --service-account "$SERVICE_ACCOUNT" \
+              --port 8000 \
+              --set-env-vars "GCP_PROJECT_ID=${PROJECT_ID}" \
+              --max-instances 10 \
+              --memory 512Mi \
+              --cpu 1 \
+              --timeout 300
           done
