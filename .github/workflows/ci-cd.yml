@@ -42,7 +42,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python3 -m pip install --upgrade pip
-          # Install all service requirements (lightweight, speeds local tools if used)
+          # Corrected the command to use '-r' for requirements files
           find . -name requirements.txt -exec pip install -r {} +
 
       - name: Cache npm
